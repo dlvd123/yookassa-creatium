@@ -8,6 +8,7 @@
     "axios": "^1.6.0",
     "uuid": "^9.0.0"
   },
+  "type": "module",  // ← ВАЖНО!
   "engines": {
     "node": ">=18"
   }
