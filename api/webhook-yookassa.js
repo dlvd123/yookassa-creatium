@@ -1,4 +1,5 @@
-import axios from 'axios';
+// api/webhook-yookassa.js
+import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,7 +8,6 @@ export default async function handler(req, res) {
 
   const body = req.body;
   const event = body.event;
-
   const payment = body.object;
   const paymentKey = payment.metadata?.payment_key;
 
@@ -25,13 +25,14 @@ export default async function handler(req, res) {
   }
 
   try {
-    await axios.post('https://api.creatium.io/integration-payment/third-party-payment', {
-      payment_key: paymentKey,
-      status: status,
+    await fetch('https://api.creatium.io/integration-payment/third-party-payment', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_key: paymentKey, status }),
     });
     console.log(`Creatium уведомлён: ${paymentKey} → ${status}`);
   } catch (e) {
-    console.error('Ошибка при уведомлении Creatium:', e.message);
+    console.error('Ошибка уведомления Creatium:', e.message);
   }
 
   res.status(200).json({ success: true });
