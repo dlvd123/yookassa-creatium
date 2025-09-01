@@ -3,12 +3,11 @@ import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req, res) {
-  // ✅ Разрешаем запросы с Creatium (dlvd.ru)
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', 'https://dlvd.ru');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  // ✅ Обрабатываем предварительный запрос (preflight)
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
@@ -23,7 +22,9 @@ export default async function handler(req, res) {
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    return res.status(500).json({ error: { message: 'Не заданы ключи ЮKassa' } });
+    return res.status(500).json({
+      error: { message: 'Не заданы ключи ЮKassa' }
+    });
   }
 
   try {
@@ -63,15 +64,20 @@ export default async function handler(req, res) {
 
     const payment = await response.json();
 
-    if (payment.confirmation && payment.confirmation.confirmation_url) {
+    if (response.ok && payment.confirmation?.confirmation_url) {
       return res.status(200).json({
         confirmation_url: payment.confirmation.confirmation_url,
       });
     } else {
-      return res.status(500).json({ error: { message: 'Не удалось получить ссылку' } });
+      console.error('Ошибка ЮKassa:', payment);
+      return res.status(500).json({
+        error: { message: payment.error?.message || 'Не удалось создать платёж' }
+      });
     }
   } catch (error) {
     console.error('Ошибка:', error);
-    return res.status(500).json({ error: { message: 'Ошибка при создании платежа' } });
+    return res.status(500).json({
+      error: { message: 'Ошибка при создании платежа' }
+    });
   }
 }
