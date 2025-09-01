@@ -1,9 +1,10 @@
+// api/payment-gateway.js
 import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Метод не поддерживается' });
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const {
@@ -18,7 +19,10 @@ export default async function handler(req, res) {
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    return res.status(500).json({ error: 'Не заданы ключи ЮKassa' });
+    console.error('YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY не заданы');
+    return res.status(500).json({
+      error: { message: 'Ошибка настройки платежной системы' }
+    });
   }
 
   try {
@@ -27,10 +31,12 @@ export default async function handler(req, res) {
       capture: true,
       confirmation: {
         type: 'redirect',
-        return_url: 'https://tvoi-sait.creatium.site',
+        return_url: 'https://tvoi-sait.creatium.site/thanks', // ← Замени на свою страницу
       },
       description,
-      meta { payment_key },
+      metadata: {
+        payment_key: payment_key,
+      },
       ...(customer_email && {
         receipt: {
           customer: { email: customer_email },
@@ -54,15 +60,19 @@ export default async function handler(req, res) {
       },
     });
 
-    res.status(200).json({
-      confirmation_url: response.data.confirmation.confirmation_url,
+    const payment = response.data;
+
+    // ✅ Ключевое: возвращаем именно confirmation_url
+    return res.status(200).json({
+      confirmation_url: payment.confirmation.confirmation_url,
     });
+
   } catch (error) {
-    console.error('Ошибка при создании платежа:', error.response?.data);
-    res.status(500).json({
+    console.error('Ошибка при создании платежа:', error.response?.data || error.message);
+    return res.status(500).json({
       error: {
-        message: error.response?.data?.error?.message || 'Ошибка при создании платежа',
-      },
+        message: error.response?.data?.error?.message || 'Не удалось создать платёж'
+      }
     });
   }
 }
