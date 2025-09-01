@@ -5,10 +5,10 @@
     "start": "vercel dev"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "node-fetch": "^3.3.2",
     "uuid": "^9.0.0"
   },
-  "type": "module",  // ← ВАЖНО!
+  "type": "module",
   "engines": {
     "node": ">=18"
   }
