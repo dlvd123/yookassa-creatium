@@ -1,6 +1,6 @@
 // api/payment-gateway.js
-import axios from 'axios';
 import { v4 as uuidv4 } from 'uuid';
+import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -19,60 +19,64 @@ export default async function handler(req, res) {
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    console.error('YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY не заданы');
     return res.status(500).json({
-      error: { message: 'Ошибка настройки платежной системы' }
+      error: { message: 'Не заданы ключи ЮKassa' }
     });
   }
 
   try {
-    const response = await axios.post('https://api.yookassa.ru/v3/payments', {
-      amount: { value: amount.toFixed(2), currency },
-      capture: true,
-      confirmation: {
-        type: 'redirect',
-        return_url: 'https://tvoi-sait.creatium.site/thanks', // ← Замени на свою страницу
-      },
-      description,
-      metadata: {
-        payment_key: payment_key,
-      },
-      ...(customer_email && {
-        receipt: {
-          customer: { email: customer_email },
-          items: [
-            {
-              description,
-              quantity: 1,
-              amount: { value: amount.toFixed(2), currency },
-              vat_code: 1,
-              payment_mode: 'full_payment',
-              payment_subject: 'commodity',
-            },
-          ],
-        },
-      }),
-    }, {
+    const response = await fetch('https://api.yookassa.ru/v3/payments', {
+      method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'Authorization': `Basic ${Buffer.from(`${shopId}:${secretKey}`).toString('base64')}`,
         'Idempotency-Key': uuidv4(),
-        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        amount: { value: amount.toFixed(2), currency },
+        capture: true,
+        confirmation: {
+          type: 'redirect',
+          return_url: 'https://tvoi-sait.creatium.site/thanks',
+        },
+        description,
+        meta {
+          payment_key,
+        },
+        ...(customer_email && {
+          receipt: {
+            customer: { email: customer_email },
+            items: [
+              {
+                description,
+                quantity: 1,
+                amount: { value: amount.toFixed(2), currency },
+                vat_code: 1,
+                payment_mode: 'full_payment',
+                payment_subject: 'commodity',
+              },
+            ],
+          },
+        }),
+      }),
     });
 
-    const payment = response.data;
+    const payment = await response.json();
 
-    // ✅ Ключевое: возвращаем именно confirmation_url
-    return res.status(200).json({
-      confirmation_url: payment.confirmation.confirmation_url,
-    });
+    if (payment.confirmation && payment.confirmation.confirmation_url) {
+      return res.status(200).json({
+        confirmation_url: payment.confirmation.confirmation_url,
+      });
+    } else {
+      return res.status(500).json({
+        error: { message: 'Не удалось получить ссылку на оплату' }
+      });
+    }
 
   } catch (error) {
-    console.error('Ошибка при создании платежа:', error.response?.data || error.message);
+    console.error('Ошибка:', error);
     return res.status(500).json({
-      error: {
-        message: error.response?.data?.error?.message || 'Не удалось создать платёж'
-      }
+      error: { message: 'Ошибка при создании платежа' }
     });
   }
 }
