@@ -1,27 +1,29 @@
 // api/payment-gateway.js
-import { v4 as uuidv4 } from 'uuid';
 import fetch from 'node-fetch';
+import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req, res) {
+  // ✅ Разрешаем запросы с Creatium (dlvd.ru)
+  res.setHeader('Access-Control-Allow-Origin', 'https://dlvd.ru');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // ✅ Обрабатываем предварительный запрос (preflight)
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const {
-    payment_key,
-    amount,
-    currency = 'RUB',
-    description = 'Оплата заказа',
-    customer_email,
-  } = req.body;
+  const { payment_key, amount, customer_email } = req.body;
 
   const shopId = process.env.YOOKASSA_SHOP_ID;
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    return res.status(500).json({
-      error: { message: 'Не заданы ключи ЮKassa' }
-    });
+    return res.status(500).json({ error: { message: 'Не заданы ключи ЮKassa' } });
   }
 
   try {
@@ -33,24 +35,22 @@ export default async function handler(req, res) {
         'Idempotency-Key': uuidv4(),
       },
       body: JSON.stringify({
-        amount: { value: amount.toFixed(2), currency },
+        amount: { value: amount.toFixed(2), currency: 'RUB' },
         capture: true,
         confirmation: {
           type: 'redirect',
-          return_url: 'https://dlvd.ru/',
+          return_url: 'https://dlvd.ru/payment-success',
         },
-        description,
-        meta {
-          payment_key,
-        },
+        description: 'Оплата заказа',
+        meta { payment_key },
         ...(customer_email && {
           receipt: {
             customer: { email: customer_email },
             items: [
               {
-                description,
+                description: 'Заказ',
                 quantity: 1,
-                amount: { value: amount.toFixed(2), currency },
+                amount: { value: amount.toFixed(2), currency: 'RUB' },
                 vat_code: 1,
                 payment_mode: 'full_payment',
                 payment_subject: 'commodity',
@@ -68,15 +68,10 @@ export default async function handler(req, res) {
         confirmation_url: payment.confirmation.confirmation_url,
       });
     } else {
-      return res.status(500).json({
-        error: { message: 'Не удалось получить ссылку на оплату' }
-      });
+      return res.status(500).json({ error: { message: 'Не удалось получить ссылку' } });
     }
-
   } catch (error) {
     console.error('Ошибка:', error);
-    return res.status(500).json({
-      error: { message: 'Ошибка при создании платежа' }
-    });
+    return res.status(500).json({ error: { message: 'Ошибка при создании платежа' } });
   }
 }
