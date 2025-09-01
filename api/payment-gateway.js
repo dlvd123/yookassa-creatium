@@ -37,7 +37,7 @@ export default async function handler(req, res) {
         capture: true,
         confirmation: {
           type: 'redirect',
-          return_url: 'https://tvoi-sait.creatium.site/thanks',
+          return_url: 'https://dlvd.ru/',
         },
         description,
         meta {
