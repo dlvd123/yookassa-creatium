@@ -1,4 +1,3 @@
-// api/webhook-yookassa.js
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
@@ -16,7 +15,7 @@ export default async function handler(req, res) {
   }
 
   let status = 'failed';
-  if (event === 'payment.succeeded') {
+   if (event === 'payment.succeeded') {
     status = 'succeeded';
   } else if (event === 'payment.canceled') {
     status = 'canceled';
@@ -30,7 +29,7 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ payment_key: paymentKey, status }),
     });
-    console.log(`Creatium уведомлён: ${paymentKey} → ${status}`);
+    console.log(Creatium уведомлён: ${paymentKey} → ${status});
   } catch (e) {
     console.error('Ошибка уведомления Creatium:', e.message);
   }
