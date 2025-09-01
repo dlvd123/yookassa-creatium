@@ -1,4 +1,3 @@
-// api/payment-gateway.js
 import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -32,7 +31,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${Buffer.from(`${shopId}:${secretKey}`).toString('base64')}`,
+        'Authorization': Basic ${Buffer.from(${shopId}:${secretKey}).toString('base64')},
         'Idempotency-Key': uuidv4(),
       },
       body: JSON.stringify({
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
           return_url: 'https://dlvd.ru/payment-success',
         },
         description: 'Оплата заказа',
-        meta { payment_key },
+        meta: { payment_key },
         ...(customer_email && {
           receipt: {
             customer: { email: customer_email },
