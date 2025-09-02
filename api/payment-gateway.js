@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req, res) {
-  // CORS (разрешаем только ваш домен)
+  // CORS
   res.setHeader('Access-Control-Allow-Origin', 'https://dlvd.ru');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -16,19 +16,31 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { payment_key, amount, customer_email } = req.body;
+  // Парсинг тела в зависимости от Content-Type
+  let body;
+  if (req.headers['content-type']?.includes('application/json')) {
+    body = req.body;
+  } else if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
+    // Парсим строку вида: payment_key=test&amount=100
+    const raw = await new Response(req).text();
+    body = Object.fromEntries(new URLSearchParams(raw));
+  } else {
+    return res.status(400).json({ error: 'Unsupported Content-Type' });
+  }
 
-  // Валидация входных данных
+  const { payment_key, amount, customer_email } = body;
+
+  // Валидация
   if (!payment_key || !amount) {
     return res.status(400).json({
-      error: { message: 'Отсутствуют обязательные параметры: payment_key или amount' }
+      error: { message: 'Missing required fields: payment_key or amount' }
     });
   }
 
   const amountValue = parseFloat(amount);
   if (isNaN(amountValue) || amountValue <= 0) {
     return res.status(400).json({
-      error: { message: 'Сумма должна быть положительным числом' }
+      error: { message: 'Amount must be a positive number' }
     });
   }
 
@@ -36,9 +48,9 @@ export default async function handler(req, res) {
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    console.error('YOOKASSA_SHOP_ID или YOOKASSA_SECRET_KEY не заданы в переменных окружения');
+    console.error('YOOKASSA_SHOP_ID or YOOKASSA_SECRET_KEY not set');
     return res.status(500).json({
-      error: { message: 'Не заданы ключи ЮKassa' }
+      error: { message: 'Payment gateway not configured' }
     });
   }
 
@@ -51,17 +63,14 @@ export default async function handler(req, res) {
         'Idempotence-Key': uuidv4(),
       },
       body: JSON.stringify({
-        amount: {
-          value: amountValue.toFixed(2), // строка с 2 знаками после запятой
-          currency: 'RUB'
-        },
+        amount: { value: amountValue.toFixed(2), currency: 'RUB' },
         capture: true,
         confirmation: {
           type: 'redirect',
-          return_url: 'https://dlvd.ru/payment-success', // ✅ без пробелов
+          return_url: 'https://dlvd.ru/payment-success',
         },
         description: 'Оплата заказа',
-        metadata: { payment_key }, // ✅ исправлено: metadata, а не meta
+        metadata: { payment_key },
         ...(customer_email && {
           receipt: {
             customer: { email: customer_email },
@@ -69,10 +78,7 @@ export default async function handler(req, res) {
               {
                 description: 'Заказ',
                 quantity: 1,
-                amount: {
-                  value: amountValue.toFixed(2),
-                  currency: 'RUB'
-                },
+                amount: { value: amountValue.toFixed(2), currency: 'RUB' },
                 vat_code: 1,
                 payment_mode: 'full_payment',
                 payment_subject: 'commodity',
@@ -90,26 +96,25 @@ export default async function handler(req, res) {
         confirmation_url: payment.confirmation.confirmation_url,
       });
     } else {
-      console.error('Ошибка от ЮKassa:', payment);
+      console.error('Ошибка ЮKassa:', payment);
       return res.status(500).json({
         error: {
           message: payment.error?.message || 'Не удалось создать платёж',
           code: payment.error?.code,
-          detail: payment.error?.description || payment.error?.parameter
         }
       });
     }
   } catch (error) {
-    console.error('Ошибка при запросе к ЮKassa:', error);
+    console.error('Ошибка:', error);
     return res.status(500).json({
       error: { message: 'Ошибка при создании платежа' }
     });
   }
 }
 
-// Экспорт конфига для Vercel (чтобы не парсил body как строку)
+// Важно: отключаем встроенный парсер, чтобы обработать raw body
 export const config = {
   api: {
-    bodyParser: true,
+    bodyParser: false,
   },
 };
