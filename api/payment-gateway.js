@@ -16,12 +16,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Парсинг тела в зависимости от Content-Type
+  // Парсинг тела запроса
   let body;
   if (req.headers['content-type']?.includes('application/json')) {
     body = req.body;
   } else if (req.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
-    // Парсим строку вида: payment_key=test&amount=100
     const raw = await new Response(req).text();
     body = Object.fromEntries(new URLSearchParams(raw));
   } else {
@@ -32,15 +31,17 @@ export default async function handler(req, res) {
 
   // Валидация
   if (!payment_key || !amount) {
+    console.error('❌ Отсутствуют обязательные поля:', { payment_key, amount });
     return res.status(400).json({
-      error: { message: 'Missing required fields: payment_key or amount' }
+      error: { message: 'Отсутствуют обязательные поля: payment_key или amount' }
     });
   }
 
   const amountValue = parseFloat(amount);
   if (isNaN(amountValue) || amountValue <= 0) {
+    console.error('❌ Неверная сумма:', amount);
     return res.status(400).json({
-      error: { message: 'Amount must be a positive number' }
+      error: { message: 'Сумма должна быть положительным числом' }
     });
   }
 
@@ -48,9 +49,9 @@ export default async function handler(req, res) {
   const secretKey = process.env.YOOKASSA_SECRET_KEY;
 
   if (!shopId || !secretKey) {
-    console.error('YOOKASSA_SHOP_ID or YOOKASSA_SECRET_KEY not set');
+    console.error('❌ Не заданы ключи ЮKassa');
     return res.status(500).json({
-      error: { message: 'Payment gateway not configured' }
+      error: { message: 'Не заданы ключи ЮKassa' }
     });
   }
 
@@ -96,7 +97,7 @@ export default async function handler(req, res) {
         confirmation_url: payment.confirmation.confirmation_url,
       });
     } else {
-      console.error('Ошибка ЮKassa:', payment);
+      console.error('❌ Ошибка от ЮKassa:', payment);
       return res.status(500).json({
         error: {
           message: payment.error?.message || 'Не удалось создать платёж',
@@ -105,14 +106,14 @@ export default async function handler(req, res) {
       });
     }
   } catch (error) {
-    console.error('Ошибка:', error);
+    console.error('❌ Ошибка при запросе к ЮKassa:', error);
     return res.status(500).json({
       error: { message: 'Ошибка при создании платежа' }
     });
   }
 }
 
-// Важно: отключаем встроенный парсер, чтобы обработать raw body
+// Важно: отключаем встроенный парсер
 export const config = {
   api: {
     bodyParser: false,
