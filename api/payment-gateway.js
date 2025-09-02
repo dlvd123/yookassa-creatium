@@ -48,7 +48,7 @@ export default async function handler(req, res) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Basic ${Buffer.from(`${shopId}:${secretKey}`).toString('base64')}`,
-        'Idempotency-Key': uuidv4(),
+        'Idempotence-Key': uuidv4(),
       },
       body: JSON.stringify({
         amount: {
